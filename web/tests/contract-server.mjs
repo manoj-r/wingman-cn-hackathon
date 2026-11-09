@@ -3,14 +3,15 @@ import { createServer } from "node:http";
 const id = "11111111-1111-4111-8111-111111111111";
 const conference = { id, name: "Cloud Native Connections", description: "Meet fellow builders", location: "Denver", startDate: "2026-11-09T16:00:00Z", endDate: "2026-11-10T01:00:00Z" };
 const registrationUrl = `http://127.0.0.1:3100/conferences/${id}/register`;
-let state = { registrations: [], creations: [], failNext: false };
+let state = { registrations: [], creations: [], failNext: false, conferences: [conference], failDirectory: false };
 createServer(async (req, res) => {
   let raw = ""; for await (const part of req) raw += part;
   const body = raw ? JSON.parse(raw) : null;
   const send = (status, data, headers = {}) => { res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store", ...headers }); res.end(JSON.stringify(data)); };
   if (req.url === "/healthz") return send(200, {});
-  if (req.url === "/__reset") { state = { registrations: [], creations: [], failNext: body?.failNext || false }; return send(200, {}); }
+  if (req.url === "/__reset") { state = { registrations: [], creations: [], failNext: body?.failNext || false, conferences: body?.conferences ?? [conference], failDirectory: body?.failDirectory || false }; return send(200, {}); }
   if (req.url === "/__state") return send(200, state);
+  if (req.url === "/api/v1/conferences" && req.method === "GET") return state.failDirectory ? send(503, { error: { code: "UNAVAILABLE" } }) : send(200, state.conferences);
   if (req.url === "/api/v1/conferences" && req.method === "POST") { state.creations.push(body); return send(201, { conference: { ...conference, ...body }, registrationUrl, organizerToken: "fixture-private-token" }); }
   if (req.url === `/api/v1/conferences/${id}`) return send(200, conference);
   if (req.url === `/api/v1/conferences/${id}/management`) {

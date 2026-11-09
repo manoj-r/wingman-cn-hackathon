@@ -46,7 +46,8 @@ Use one branch per feature: `feature/backend-foundation` (M1), `feature/conferen
 
 ### M2 — Persist conferences and secure registration
 
-- [ ] Complete M2.
+- [x] Complete M2.
+- Verification evidence (2026-11-09): focused seven-class Gradle suite passed 18 tests against dedicated PostgreSQL database `wingman_test`, including concurrent identical requests, duplicate rollback without orphan attendees, digest-only capabilities, cookie rotation/expiry, rate/body/origin limits, and application restart preserving registration and organizer count. Two added trim-before-length-validation regression tests failed with 400 before the DTO normalization fix and passed afterward. Matching endpoints remain M3/M4 work.
 - Scope: migrations, JPA entities, validation, organizer token, registration transaction, duplicate/idempotent retry behavior and attendee count API. Store idempotency key/digest, session token hash/expiry and initial matching status directly on registration; no separate request, session or processing entities. Verify concurrent identical submissions create one registration and changed-payload replay returns 409.
 - Files/components affected: `backend/src/main/resources/db/migration/V1__core_schema.sql`, backend `conference/`, `attendee/`, `registration/`, `security/`; tests `ConferenceApiIntegrationTest.java`, `RegistrationIntegrationTest.java`, `CapabilitySecurityTest.java` under backend test package.
 - Acceptance criteria: FR-001/003/004; create/read/count works; bad date rejected; duplicate/replayed requests behave per API contract; concurrent duplicate insert cannot orphan attendee; wrong organizer token and absent attendee cookie denied; public JSON never exposes email/token hash. Committed registration survives restart.

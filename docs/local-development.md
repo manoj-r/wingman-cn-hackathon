@@ -28,6 +28,14 @@ Ports 5432 and 9200 must be free. Both bind only to 127.0.0.1. Elasticsearch sec
 
 ## Backend
 
+Create the dedicated integration-test database once after PostgreSQL is healthy (an already-existing database needs no change):
+
+```sh
+docker compose exec -T postgres createdb -U wingman wingman_test
+```
+
+Tests use `wingman_test`, never reset demo data, and leave uniquely identified fictional fixtures there. Flyway creates the schema; JPA validates it on startup. The restart test closes and starts the application against the same database to verify persisted registrations and counts.
+
 ```sh
 ./backend/gradlew -p backend test
 ./backend/gradlew -p backend bootRun
@@ -42,7 +50,9 @@ curl -f http://localhost:8081/api/v1/version
 curl -f http://localhost:9200/_cluster/health
 ```
 
-Liveness is independent of database and AI availability. Readiness includes PostgreSQL connectivity and returns 503 if it is unavailable. The health tests isolate HTTP/lifecycle behavior from the database; live smoke checks verify PostgreSQL separately. `APP_VERSION` supplies the version response, defaulting to `local`.
+Liveness is independent of database and AI availability after startup. Startup requires PostgreSQL for Flyway and JPA schema validation. Readiness includes PostgreSQL connectivity and returns 503 if it is unavailable. Health integration tests use the dedicated PostgreSQL test database. `APP_VERSION` supplies the version response, defaulting to `local`.
+
+M2 adds `/api/v1/conferences`, private organizer management, and registration. `PUBLIC_APP_URL` supplies the trusted registration-link base (default `http://localhost:3000`); HTTPS enables Secure session cookies. Save the returned organizer token privately: only its digest is stored. Matching routes are deferred to M3/M4; M2 authenticates attendee capabilities without returning fabricated matches.
 
 ```sh
 docker compose stop

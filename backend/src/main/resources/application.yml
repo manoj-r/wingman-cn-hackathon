@@ -31,3 +31,7 @@ management:
           include: readinessState,db
 wingman:
   version: ${APP_VERSION:local}
+logging:
+  level:
+    # PostgreSQL constraint diagnostics include private email/idempotency values.
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: OFF

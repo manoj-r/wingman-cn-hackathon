@@ -33,6 +33,10 @@ class ConferenceApiIntegrationTest {
         assertThat(body.path("registrationUrl").asText()).endsWith("/conferences/" + id + "/register").doesNotContain(token);
         String publicBody = http.getForObject("/api/v1/conferences/" + id, String.class);
         assertThat(publicBody).contains("Fictional Builders").doesNotContain(token, "organizerToken", "email");
+        var directory = http.getForEntity("/api/v1/conferences", JsonNode.class);
+        assertThat(directory.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(directory.getHeaders().getCacheControl()).contains("no-store");
+        assertThat(directory.getBody().toString()).contains("Fictional Builders").doesNotContain(token, "organizerToken", "email");
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
         var management = http.exchange("/api/v1/conferences/" + id + "/management", HttpMethod.GET, new HttpEntity<>(headers), String.class);

@@ -3,13 +3,14 @@ import { createServer } from "node:http";
 const id = "11111111-1111-4111-8111-111111111111";
 const conference = { id, name: "Cloud Native Connections", description: "Meet fellow builders", location: "Denver", startDate: "2026-11-09T16:00:00Z", endDate: "2026-11-10T01:00:00Z" };
 const registrationUrl = `http://127.0.0.1:3100/conferences/${id}/register`;
-let state = { registrations: [], creations: [], failNext: false, conferences: [conference], failDirectory: false };
+const sampleMatches = [{ attendeeId: "33333333-3333-4333-8333-333333333333", name: "Jordan Rivera", jobTitle: "SRE", company: "Sample Systems", interests: ["OpenTelemetry"], explanation: "You both work on observability and developer experience.", conversationStarter: "What has helped your team make tracing easier to adopt?" }];
+let state = { registrations: [], creations: [], failNext: false, conferences: [conference], failDirectory: false, matches: { registrationId: "22222222-2222-4222-8222-222222222222", matchingStatus: "READY", generationMode: "llm", matches: sampleMatches, availableMatchCount: 1, retryable: false }, introductions: [], failMatches: false, failIntroduction: false };
 createServer(async (req, res) => {
   let raw = ""; for await (const part of req) raw += part;
   const body = raw ? JSON.parse(raw) : null;
   const send = (status, data, headers = {}) => { res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store", ...headers }); res.end(JSON.stringify(data)); };
   if (req.url === "/healthz") return send(200, {});
-  if (req.url === "/__reset") { state = { registrations: [], creations: [], failNext: body?.failNext || false, conferences: body?.conferences ?? [conference], failDirectory: body?.failDirectory || false }; return send(200, {}); }
+  if (req.url === "/__reset") { state = { registrations: [], creations: [], failNext: body?.failNext || false, conferences: body?.conferences ?? [conference], failDirectory: body?.failDirectory || false, matches: body?.matches ?? { registrationId: "22222222-2222-4222-8222-222222222222", matchingStatus: "READY", generationMode: "llm", matches: sampleMatches, availableMatchCount: 1, retryable: false }, introductions: [], failMatches: body?.failMatches || false, failIntroduction: body?.failIntroduction || false }; return send(200, {}); }
   if (req.url === "/__state") return send(200, state);
   if (req.url === "/api/v1/conferences" && req.method === "GET") return state.failDirectory ? send(503, { error: { code: "UNAVAILABLE" } }) : send(200, state.conferences);
   if (req.url === "/api/v1/conferences" && req.method === "POST") { state.creations.push(body); return send(201, { conference: { ...conference, ...body }, registrationUrl, organizerToken: "fixture-private-token" }); }
@@ -24,6 +25,8 @@ createServer(async (req, res) => {
     if (!req.headers["idempotency-key"]) return send(400, { error: { code: "VALIDATION_ERROR" } });
     return send(201, { registrationId: "22222222-2222-4222-8222-222222222222", conferenceId: id, matchingStatus: "PENDING", connectionsPath: "/connections" }, { "Set-Cookie": "wingman_attendee=fixture-session; HttpOnly; SameSite=Lax; Path=/api/v1; Max-Age=86400" });
   }
-  if (req.url === "/api/v1/me/matches") return send(200, { hasCookie: req.headers.cookie?.includes("wingman_attendee=fixture-session") || false });
+  if (req.url === "/api/v1/me/matches" && req.method === "GET") return state.failMatches ? send(503, { error: { code: "UNAVAILABLE" } }) : send(200, { ...state.matches, hasCookie: req.headers.cookie?.includes("wingman_attendee=fixture-session") || false });
+  if (req.url === "/api/v1/me/matches/retry" && req.method === "POST") { state.matches = { ...state.matches, matchingStatus: "PENDING", matches: [], retryable: false, pollAfterSeconds: 2 }; return send(202, { matchingStatus: "PENDING" }); }
+  if (req.url === "/api/v1/me/introductions" && req.method === "POST") { if (state.failIntroduction) return send(503, { error: { code: "UNAVAILABLE" } }); state.introductions.push(body); return send(200, { targetAttendeeId: body.targetAttendeeId, text: "Hi Jordan, I’m Alex. I’d love to hear about tracing adoption.", generationMode: "llm", delivery: "copy-only" }); }
   return send(404, { error: { code: "NOT_FOUND" } });
 }).listen(8189, "127.0.0.1");

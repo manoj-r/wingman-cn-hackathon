@@ -7,9 +7,9 @@ import io.opentelemetry.sdk.resources.Resource;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import java.time.Duration;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.TreeMap;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,10 +25,11 @@ class TelemetryConfiguration {
         var provider = SdkTracerProvider.builder().setResource(Resource.getDefault().toBuilder()
             .put("service.name", serviceName).build());
         if ("otlp".equalsIgnoreCase(exporter) && !endpoint.isBlank()) {
+            Map<String, String> parsedHeaders = parseHeaders(headers);
             provider.addSpanProcessor(BatchSpanProcessor.builder(
                     OtlpHttpSpanExporter.builder()
                         .setEndpoint(endpoint)
-                        .setHeaders(() -> parseHeaders(headers))
+                        .setHeaders(() -> parsedHeaders)
                         .setTimeout(Duration.ofSeconds(5))
                         .build())
                 .setExporterTimeout(Duration.ofSeconds(5))
@@ -44,14 +45,19 @@ class TelemetryConfiguration {
 
     static Map<String, String> parseHeaders(String value) {
         if (value.isBlank()) return Map.of();
-        return Arrays.stream(value.split(","))
-            .map(String::trim)
-            .filter(entry -> !entry.isEmpty())
-            .map(entry -> {
-                int separator = entry.indexOf('=');
-                if (separator <= 0) throw new IllegalArgumentException("Malformed OTLP header configuration");
-                return Map.entry(entry.substring(0, separator).trim(), entry.substring(separator + 1).trim());
-            })
-            .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
+        Map<String, String> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        for (String rawEntry : value.split(",")) {
+            String entry = rawEntry.trim();
+            if (entry.isEmpty()) continue;
+            int separator = entry.indexOf('=');
+            if (separator <= 0) throw new IllegalArgumentException("Malformed OTLP header configuration");
+            String key = entry.substring(0, separator).trim();
+            String headerValue = entry.substring(separator + 1).trim();
+            if (key.isEmpty()) throw new IllegalArgumentException("Malformed OTLP header configuration");
+            if (headers.putIfAbsent(key, headerValue) != null) {
+                throw new IllegalArgumentException("Duplicate OTLP header configuration");
+            }
+        }
+        return Collections.unmodifiableMap(headers);
     }
 }

@@ -65,4 +65,23 @@ class TelemetryPrivacyTest {
         assertThat(failure).hasMessage("Malformed OTLP header configuration")
             .hasMessageNotContaining("secret-value");
     }
+
+    @Test
+    void duplicatePrivateHeadersFailWithoutEchoingTheirValues() {
+        var failure = org.assertj.core.api.Assertions.catchThrowable(
+            () -> TelemetryConfiguration.parseHeaders(
+                "Authorization=Bearer first-secret,authorization=Bearer second-secret"));
+        assertThat(failure).hasMessage("Duplicate OTLP header configuration")
+            .hasMessageNotContaining("first-secret")
+            .hasMessageNotContaining("second-secret");
+    }
+
+    @Test
+    void malformedHeadersFailDuringOptedInTelemetryConfiguration() {
+        var failure = org.assertj.core.api.Assertions.catchThrowable(
+            () -> new TelemetryConfiguration().openTelemetrySdk(
+                "otlp", "http://localhost:4318/v1/traces", "malformed-secret-header", "test-service"));
+        assertThat(failure).hasMessage("Malformed OTLP header configuration")
+            .hasMessageNotContaining("malformed-secret-header");
+    }
 }

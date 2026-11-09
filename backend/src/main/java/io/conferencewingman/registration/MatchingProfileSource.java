@@ -21,6 +21,20 @@ public class MatchingProfileSource {
         return attendeeIds.stream().filter(id -> !id.equals(excludedAttendee))
             .filter(id -> registrations.existsByConferenceIdAndAttendeeId(conferenceId,id)).distinct().limit(3).toList();
     }
+    @Transactional(readOnly=true)
+    public List<Profile> eligibleProfiles(UUID conferenceId, UUID excludedAttendee, List<UUID> attendeeIds) {
+        return eligibleAttendees(conferenceId, excludedAttendee, attendeeIds).stream()
+            .map(id -> attendees.findById(id).orElse(null))
+            .filter(Objects::nonNull)
+            .map(a -> registrations.findByConferenceIdAndAttendeeId(conferenceId, a.id)
+                .map(r -> new Profile(r.id,conferenceId,a.id,a.name,a.jobTitle,a.company,a.bio,a.networkingGoals,List.copyOf(a.interests))))
+            .flatMap(Optional::stream).limit(3).toList();
+    }
+    @Transactional(readOnly=true)
+    public Optional<Profile> findByAttendeeId(UUID conferenceId, UUID attendeeId) {
+        return registrations.findByConferenceIdAndAttendeeId(conferenceId,attendeeId).flatMap(r -> attendees.findById(attendeeId).map(a ->
+            new Profile(r.id,conferenceId,a.id,a.name,a.jobTitle,a.company,a.bio,a.networkingGoals,List.copyOf(a.interests))));
+    }
     public record Profile(UUID registrationId, UUID conferenceId, UUID attendeeId, String name, String jobTitle,
         String company, String bio, String networkingGoals, List<String> interests) {
         public String embeddingText() { return String.join("\n", List.of("Role: "+jobTitle,"Company: "+company,

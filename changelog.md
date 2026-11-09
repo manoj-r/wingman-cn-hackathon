@@ -4,3 +4,4 @@
 
 - Specified Conference Wingman's MVP requirements, architecture, API, data model, implementation milestones and recorded demo plan while preserving the starter integrations.
 - Kept registration idempotency on the registration entity to simplify persistence and define safe concurrent retry behavior.
+- Simplified the MVP model by keeping processing and private session fields on registration, with a separate table only for its multiple match results.

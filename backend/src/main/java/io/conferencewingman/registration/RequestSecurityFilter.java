@@ -109,8 +109,7 @@ class RequestSecurityFilter extends OncePerRequestFilter {
     }
 
     private static String lookupPath(HttpServletRequest request) {
-        String decoded = PATHS.decodeRequestString(request, PATHS.getPathWithinApplication(request));
-        return decoded.replaceAll(";[^/]*", "");
+        return PATHS.getPathWithinApplication(request);
     }
 
     private static UrlPathHelper lookupPathHelper() {

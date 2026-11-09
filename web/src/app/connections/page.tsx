@@ -19,6 +19,7 @@ export default function Connections() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openerRef = useRef<HTMLButtonElement>(null);
   const deadlineRef = useRef(0);
+  const introductionRequestRef = useRef(0);
 
   const load = useCallback(async (automatic = false) => {
     if (!automatic) setLoading(true);
@@ -59,6 +60,7 @@ export default function Connections() {
   };
 
   const openIntroduction = async (match: Matches["matches"][number], button: HTMLButtonElement) => {
+    const requestId = ++introductionRequestRef.current;
     setSelected(match);
     setIntroduction(null);
     setIntroError("");
@@ -67,16 +69,22 @@ export default function Connections() {
     dialogRef.current?.showModal();
     setIntroBusy(true);
     try {
-      setIntroduction(await api<Introduction>("/me/introductions", { method: "POST", body: JSON.stringify({ targetAttendeeId: match.attendeeId }) }));
-    } catch (cause) { setIntroError(asError(cause).message); }
-    finally { setIntroBusy(false); }
+      const result = await api<Introduction>("/me/introductions", { method: "POST", body: JSON.stringify({ targetAttendeeId: match.attendeeId }) });
+      if (introductionRequestRef.current === requestId) setIntroduction(result);
+    } catch (cause) {
+      if (introductionRequestRef.current === requestId) setIntroError(asError(cause).message);
+    } finally {
+      if (introductionRequestRef.current === requestId) setIntroBusy(false);
+    }
   };
 
   const closeDialog = () => {
+    introductionRequestRef.current++;
     dialogRef.current?.close();
     setSelected(null);
     setIntroduction(null);
     setIntroError("");
+    setIntroBusy(false);
     setCopied(false);
     requestAnimationFrame(() => openerRef.current?.focus());
   };

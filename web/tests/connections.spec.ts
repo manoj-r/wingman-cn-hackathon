@@ -31,6 +31,48 @@ test("shows private recommendations and an editable copy-only introduction dialo
   expect((await request.get(`${fixture}/__state`).then(response => response.json())).introductions).toEqual([{ targetAttendeeId: attendee.attendeeId }]);
 });
 
+test("ignores a late introduction response after closing and reopening for another attendee", async ({ page }) => {
+  const secondAttendee = { ...attendee, attendeeId: "44444444-4444-4444-8444-444444444444", name: "Casey Morgan" };
+  await page.route("**/api/v1/me/matches", route => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ ...ready, matches: [attendee, secondAttendee], availableMatchCount: 2 }),
+  }));
+
+  let releaseFirst!: () => void;
+  let releaseSecond!: () => void;
+  const firstResponse = new Promise<void>(resolve => { releaseFirst = resolve; });
+  const secondResponse = new Promise<void>(resolve => { releaseSecond = resolve; });
+  await page.route("**/api/v1/me/introductions", async route => {
+    const { targetAttendeeId } = route.request().postDataJSON();
+    await (targetAttendeeId === attendee.attendeeId ? firstResponse : secondResponse);
+    const target = targetAttendeeId === attendee.attendeeId ? attendee : secondAttendee;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ targetAttendeeId, text: `Hi ${target.name}, nice to meet you.`, generationMode: "llm", delivery: "copy-only" }),
+    });
+  });
+
+  await page.goto("/connections");
+  const openers = page.getByRole("button", { name: "Prepare an introduction" });
+  await openers.nth(0).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("status")).toHaveText("Preparing your introduction…");
+  await dialog.getByRole("button", { name: "Close" }).click();
+
+  await openers.nth(1).click();
+  await expect(dialog.getByRole("heading", { name: "Introduction to Casey Morgan" })).toBeVisible();
+  await expect(dialog.getByRole("status")).toHaveText("Preparing your introduction…");
+
+  const firstRequestResponse = page.waitForResponse(response => response.url().includes("/api/v1/me/introductions") && response.request().postData()?.includes(attendee.attendeeId) === true);
+  releaseFirst();
+  await firstRequestResponse;
+  await expect(dialog.getByRole("status")).toHaveText("Preparing your introduction…");
+  await expect(dialog.getByRole("textbox", { name: "Edit your introduction" })).toHaveCount(0);
+
+  releaseSecond();
+  await expect(dialog.getByRole("textbox", { name: "Edit your introduction" })).toHaveValue("Hi Casey Morgan, nice to meet you.");
+});
+
 test("labels degraded output and presents the valid empty state", async ({ page, request }) => {
   await request.post(`${fixture}/__reset`, { data: { matches: { ...ready, generationMode: "template", matches: [], availableMatchCount: 0 } } });
   await page.goto("/connections");

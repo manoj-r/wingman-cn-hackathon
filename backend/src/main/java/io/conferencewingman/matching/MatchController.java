@@ -29,7 +29,12 @@ class MatchController {
             else body.put("pollAfterSeconds",2);
             return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body);
         }
-        var matches=jdbc.query("select rm.attendee_id,a.name,a.job_title,a.company,rm.explanation,rm.conversation_starter from registration_match rm join attendee a on a.id=rm.attendee_id where rm.registration_id=? order by rm.created_at limit 3",
+        var matches=jdbc.query("select rm.attendee_id,a.name,a.job_title,a.company,rm.explanation,rm.conversation_starter "
+                        + "from registration_match rm join registration owner on owner.id=rm.registration_id "
+                        + "join registration target on target.conference_id=owner.conference_id "
+                        + "and target.attendee_id=rm.attendee_id join attendee a on a.id=target.attendee_id "
+                        + "where rm.registration_id=? and target.attendee_id<>owner.attendee_id "
+                        + "order by rm.created_at limit 3",
             (rs,row)->new MatchRow((UUID)rs.getObject("attendee_id"),rs.getString("name"),rs.getString("job_title"),rs.getString("company"),rs.getString("explanation"),rs.getString("conversation_starter")),registration);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("registrationId",registration,"matchingStatus","READY","generationMode","llm","matches",matches,"availableMatchCount",matches.size(),"retryable",false,"traceId",UUID.randomUUID().toString()));
     }

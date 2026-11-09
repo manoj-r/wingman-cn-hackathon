@@ -10,9 +10,14 @@ Status: proposed schema. PostgreSQL owns identity, registration, capabilities an
 | Attendee / `attendee` | id PK; name varchar(120); email varchar(254), normalized lowercase; job_title/company varchar(160); bio text; networking_goals text; created_at timestamp. All non-null. |
 | Attendee interests / `attendee_interest` | attendee_id FK cascade, ordinal integer, interest varchar(60); PK(attendee_id, ordinal), unique(attendee_id, interest). Map as JPA element collection, preserve order. |
 | Registration / `registration` | id PK; conference_id FK; attendee_id FK; normalized_email varchar(254); idempotency_key UUID; request_hash bytea (32-byte SHA-256 digest of canonical request, including normalized email); created_at timestamp. All non-null. unique(conference_id, attendee_id); unique(attendee_id) for the MVP's per-registration profile policy; unique(conference_id, normalized_email); unique(conference_id, idempotency_key). |
-| Processing / `registration_processing` | registration_id PK/FK cascade; status PENDING/PROCESSING/READY/FAILED; embedding_status PENDING/READY/FAILED; index_status PENDING/READY/FAILED; attempts integer; lease_until; next_attempt_at; safe_error_code; embedding_model; embedding_dimensions; index_version; updated_at. |
-| Session / `attendee_session` | registration_id unique FK cascade; capability_hash unique bytea; expires_at timestamp. One active capability per registration; rotate on idempotent replay. |
 | Match snapshot / `registration_match` | source_registration_id FK cascade; target_registration_id FK cascade; rank 1–3; explanation varchar(600); conversation_starter varchar(400); generation_mode; generated_at; PK(source_registration_id,rank); unique(source_registration_id,target_registration_id); self-match forbidden. |
+
+Keep processing and session fields directly on `registration`; no separate entities or tables for either:
+
+- Processing: `matching_status` PENDING/PROCESSING/READY/FAILED (non-null, default PENDING), `attempts` (non-null, default 0), nullable `lease_until`, `next_attempt_at`, `safe_error_code`, and non-null `updated_at`. Retry the complete embedding/indexing/matching pipeline; idempotent index upserts make separate embedding/index status fields unnecessary. Model, dimension and index version come from configuration and Elasticsearch projection metadata.
+- Private access: `session_token_hash` (unique 32-byte SHA-256 digest) and `session_expires_at`, both non-null. One active capability per registration; rotate both fields on identical idempotent replay. Never persist the raw cookie value.
+
+This leaves four domain entities: Conference, Attendee, Registration and RegistrationMatch, plus the attendee interests collection table.
 
 ### Identity and duplicate policy
 
@@ -20,9 +25,9 @@ No global attendee account or public email lookup. For simplicity, create a dist
 
 Idempotency belongs to the registration itself: one successful request creates one registration, so no separate request entity is needed. Persist key and request digest in the same transaction as attendee, registration and initial processing state. An identical replay finds the registration by conference/key, compares the canonical request digest, and rotates its session capability; a changed payload returns 409. On a concurrent unique-constraint conflict, roll back the losing transaction before looking up the committed registration in a fresh transaction and applying the same replay rules. Failed validation or a rolled-back submission reserves no key. Demo seed registrations also receive stable keys and canonical request digests. Retain these fields for the registration's lifetime; storing failed requests or supporting multiple keys per registration is outside MVP scope.
 
-Persist processing row with registration so a crash cannot lose indexing work. Claim rows atomically with PostgreSQL locking; single-worker MVP, bounded queue and lease recovery. Match snapshot replacement and status READY update are one transaction. Verify both registrations' conferences in the service before storing and before returning a match. Hard deletes are not exposed in MVP; future deletion must remove/rebuild search projections too.
+Persist initial processing and session fields on registration in its creation transaction so a crash cannot lose indexing work. Claim pending registration rows atomically with PostgreSQL locking; single-worker MVP, bounded queue and lease recovery. Match snapshot replacement and registration matching_status READY update are one transaction. Verify both registrations' conferences in the service before storing and before returning a match. Hard deletes are not exposed in MVP; future deletion must remove/rebuild search projections too.
 
-Indexes: registration(conference_id), registration_processing(status,next_attempt_at), attendee_session(capability_hash), and unique registration(conference_id,normalized_email). Do not store raw capability or organizer tokens in migrations, fixtures or logs.
+Indexes: registration(conference_id), registration(matching_status,next_attempt_at), unique registration(session_token_hash), and unique registration(conference_id,normalized_email). Do not store raw capability or organizer tokens in migrations, fixtures or logs.
 
 ## Elasticsearch projection
 

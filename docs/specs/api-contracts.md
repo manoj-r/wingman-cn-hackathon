@@ -40,7 +40,7 @@ Request:
 {"registrationId":"22222222-2222-4222-8222-222222222222","conferenceId":"11111111-1111-4111-8111-111111111111","matchingStatus":"PENDING","connectionsPath":"/connections"}
 ```
 
-Set `wingman_attendee=<opaque-random-capability>; HttpOnly; SameSite=Lax; Path=/api/v1`; add Secure on HTTPS. Cookie lifetime 24 hours; only hash/expiry stored. One active registration session per browser for MVP; a new registration replaces that session. PostgreSQL failures return 503 without a success response. AI/Elasticsearch failure after persistence does not turn registration into a failed submission.
+Set `wingman_attendee=<opaque-random-capability>; HttpOnly; SameSite=Lax; Path=/api/v1`; add Secure on HTTPS. Cookie lifetime 24 hours; only `session_token_hash` and `session_expires_at` stored directly on registration. One active capability per registration and one active registration session per browser for MVP; a new registration replaces that browser cookie. PostgreSQL failures return 503 without a success response. AI/Elasticsearch failure after persistence does not turn registration into a failed submission.
 
 ## Recommendations
 

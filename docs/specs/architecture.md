@@ -34,7 +34,7 @@ Backend packages under `io.conferencewingman`: conference, attendee, registratio
 5. Request explanations and openers for all returned candidates in one bounded LLM call. Validate structured response against candidate IDs and length limits. Store result and status `READY`; frontend polls every two seconds for at most 45 seconds, then shows pending/retry rather than polling forever.
 6. “Help Me Connect” calls a separate LLM operation for an existing authorized match. It generates text only. All profile text is untrusted data; prompts forbid obeying embedded instructions or inventing facts.
 
-Registration is not rolled back on downstream failure. Intermediate embedding/index status is persisted for safe retries. Reprocessing may recompute matches from the current index; completed results are a snapshot until explicit retry. Retry endpoint returns 202 and queues work rather than blocking HTTP on AI.
+Registration is not rolled back on downstream failure. Store matching status, retry/lease fields, idempotency fields and attendee session hash/expiry directly on `registration`; no separate processing, request or session entities. Retry the complete pipeline using idempotent Elasticsearch upserts rather than tracking separate embedding/index stages. Keep one `registration_match` row per recommended connection to save explanations/openers without repeating LLM calls on refresh. Reprocessing may recompute matches from the current index; completed results remain saved until explicit retry. Retry endpoint returns 202 and queues work rather than blocking HTTP on AI.
 
 ## Configuration and dependency gates
 

@@ -41,7 +41,7 @@ Critical path: M0 → M1 → M2 → M3 → M4 → M6 → M8. M5 can follow M2 be
 ### M2 — Persist conferences and secure registration
 
 - [ ] Complete M2.
-- Scope: migrations, JPA entities, validation, organizer token, registration transaction, attendee session, duplicate/idempotent retry behavior and attendee count API. Store idempotency key/digest on registration; verify concurrent identical submissions create one registration and changed-payload replay returns 409.
+- Scope: migrations, JPA entities, validation, organizer token, registration transaction, duplicate/idempotent retry behavior and attendee count API. Store idempotency key/digest, session token hash/expiry and initial matching status directly on registration; no separate request, session or processing entities. Verify concurrent identical submissions create one registration and changed-payload replay returns 409.
 - Files/components affected: `backend/src/main/resources/db/migration/V1__core_schema.sql`, backend `conference/`, `attendee/`, `registration/`, `security/`; tests `ConferenceApiIntegrationTest.java`, `RegistrationIntegrationTest.java`, `CapabilitySecurityTest.java` under backend test package.
 - Acceptance criteria: FR-001/003/004; create/read/count works; bad date rejected; duplicate/replayed requests behave per API contract; concurrent duplicate insert cannot orphan attendee; wrong organizer token and absent attendee cookie denied; public JSON never exposes email/token hash. Committed registration survives restart.
 - Verification commands: `./backend/gradlew -p backend test --tests '*ConferenceApiIntegrationTest' --tests '*RegistrationIntegrationTest' --tests '*CapabilitySecurityTest'`; restart backend; rerun API persistence assertions against real PostgreSQL. Integration tests use a dedicated test database, not destructive resets of demo data.
@@ -51,7 +51,7 @@ Critical path: M0 → M1 → M2 → M3 → M4 → M6 → M8. M5 can follow M2 be
 ### M3 — Real embeddings, durable indexing and filtered kNN
 
 - [ ] Complete M3.
-- Scope: embedding adapter, versioned mapping, durable worker/leases/retries, idempotent upsert and conference-filtered search.
+- Scope: embedding adapter, versioned mapping, single durable worker using registration status/retry/lease fields, idempotent upsert and conference-filtered search. Retry the full pipeline; omit separate embedding/index status fields and processing table.
 - Files/components affected: `backend/src/main/resources/db/migration/V2__matching_state.sql`; backend `ai/EmbeddingClient.java`, `matching/ProfileIndexer.java`, `matching/MatchingWorker.java`, `matching/MatchSearch.java`; tests `SemanticSearchIntegrationTest.java`, `MatchingRecoveryTest.java`.
 - Acceptance criteria: FR-005/006/007; real vectors indexed; three unique same-conference peers; self excluded; deliberately similar other-conference attendee excluded; 0/1/2 peers handled; dimension errors fail safely; Elasticsearch outage preserves registration; restart recovers pending/expired work. Stubs do not pass real-provider smoke gate.
 - Verification commands: `./backend/gradlew -p backend test --tests '*SemanticSearchIntegrationTest' --tests '*MatchingRecoveryTest'`; `./backend/gradlew -p backend integrationTest` (add this task for opt-in real PostgreSQL/ES/provider tests). Inspect sanitized result IDs/counts through API, not raw profile dumps.
@@ -61,7 +61,7 @@ Critical path: M0 → M1 → M2 → M3 → M4 → M6 → M8. M5 can follow M2 be
 ### M4 — Grounded explanations and introduction generation
 
 - [ ] Complete M4.
-- Scope: one batch LLM call for three explanations/openers, strict output validation, stored match snapshots, poll/retry endpoints and copy-only introduction endpoint.
+- Scope: one batch LLM call for three explanations/openers, strict output validation, saved results in registration_match (one row per recommended connection), poll/retry endpoints and copy-only introduction endpoint. Keep this as the only additional domain entity beyond conference, attendee and registration.
 - Files/components affected: backend `ai/LlmClient.java`, `matching/RecommendationService.java`, `matching/MatchController.java`, `matching/IntroductionService.java`; tests `RecommendationServiceTest.java`, `IntroductionSecurityTest.java`.
 - Acceptance criteria: FR-008/009/010; real output references actual supplied interests/goals; invalid JSON/unknown IDs rejected; prompt injection text cannot grant access or alter tool behavior; wrong conference/nonmatch target denied; failure UI can distinguish templates from actual LLM output. Timeouts leave durable status, not an indefinite worker lease.
 - Verification commands: `./backend/gradlew -p backend test --tests '*RecommendationServiceTest' --tests '*IntroductionSecurityTest'`; `./backend/gradlew -p backend integrationTest`; manually read one real explanation/opener/introduction for grounding and tone.

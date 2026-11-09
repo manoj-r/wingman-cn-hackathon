@@ -59,6 +59,14 @@ class RequestSecurityFilterTest {
                 "203.0.113.201, 198.51.100.3", null, new AtomicInteger()).getStatus()).isEqualTo(429);
     }
 
+    @Test void invalidForwardedIdentityFallsBackToSocketPeer() throws Exception {
+        var filter = filter(1, "10.0.0.8");
+        assertThat(invoke(filter, "/api/v1/conferences", "10.0.0.8", "198.51.100.999", null,
+                new AtomicInteger()).getStatus()).isEqualTo(200);
+        assertThat(invoke(filter, "/api/v1/conferences", "10.0.0.8", null, null,
+                new AtomicInteger()).getStatus()).isEqualTo(429);
+    }
+
     @Test void newClientsAreAdmittedAfterTheWindowMapReachesCapacity() throws Exception {
         var filter = filter(5000, "10.0.0.8");
         var calls = new AtomicInteger();

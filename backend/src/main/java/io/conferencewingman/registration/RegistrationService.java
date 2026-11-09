@@ -57,8 +57,7 @@ class RegistrationService {
     }
 
     List<ConferenceView> conferences() {
-        return conferences.findAll().stream()
-            .sorted(Comparator.comparing(c -> c.startDate))
+        return conferences.findTop100ByEndDateAfterOrderByStartDateAsc(Instant.now()).stream()
             .map(c -> new ConferenceView(c.id, c.name, c.description, c.location, c.startDate, c.endDate))
             .toList();
     }

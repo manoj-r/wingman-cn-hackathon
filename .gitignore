@@ -9,3 +9,8 @@
 node_modules/
 npm-debug.log*
 .DS_Store
+.worktrees/
+.gradle/
+build/
+.next/
+out/

@@ -1,6 +1,6 @@
 # Conference Wingman implementation plan
 
-Status: proposed checklist, not evidence of implementation. Execute only after this specification handoff. All paths below other than existing starter paths are proposed. Commands must be run one at a time from the repository root unless marked with a working directory. Test selectors name tests to create during that milestone; they do not exist yet.
+Status: implementation started; checked milestones have verification evidence below. Unchecked paths and tests remain proposed. Commands must be run one at a time from the feature worktree root unless marked with a working directory.
 
 **Goal:** deliver a reliable local end-to-end application and a reviewed three-minute video before 17:30 Mountain.
 
@@ -14,13 +14,18 @@ Planning time observed about 12:14 Mountain on 2026-11-09, leaving roughly five 
 
 Work serially in small verified commits. For each milestone, write the named meaningful test first, observe its failure, implement the smallest slice, then run the listed checks and review the diff. Do not modify `.idea/`. Do not accidentally stage secrets or generated artifacts. New dependencies need current Context7 documentation and pinned compatible versions. Check original starter still answers `/healthz`, `/readyz` and `/api/sessions` after introducing build changes.
 
-Critical path: M0 → M1 → M2 → M3 → M4 → M6 → M8. M5 can follow M2 before M3 if visual progress is useful; M7 must complete before M8 acceptance. No implementation is part of this specification task.
+Critical path: M0 → M1 → M2 → M3 → M4 → M6 → M8. M5 can follow M2 before M3 if visual progress is useful; M7 must complete before M8 acceptance. Independent backend/UI work may proceed while provider-specific M0 checks remain blocked; M3/M4/M7 cannot pass acceptance without their real dependencies.
+
+### Feature branch workflow
+
+Use one branch per feature: `feature/backend-foundation` (M1), `feature/conference-registration` (M2), `feature/semantic-matching` (M3), `feature/ai-connections` (M4), `feature/organizer-registration-ui` (M5), `feature/connections-ui` (M6), `feature/telemetry` (M7), and `feature/demo-readiness` (M8). Dependent branches start from the preceding verified branch until merged; keep commits scoped and test each slice. Do not merge unfinished milestones into main. Worktrees live under ignored `.worktrees/`.
 
 ## Milestones
 
 ### M0 — Resolve prerequisites and lock the runtime contract
 
 - [ ] Complete M0.
+- Evidence so far (2026-11-09): Java 21.0.7 available via SDKMAN; Node 24.4.1 satisfies the documented Next.js 16 minimum (20.9+); Docker 28.0.4 / Compose 2.34.0 with about 8 GiB memory. Spring Boot 3.5.16 artifact verified; Gradle 8.14.3 official checksum verified. PostgreSQL 17.6 and Elasticsearch 8.19.0 run successfully. Frontend lock remains M5 work. OpenAI embedding and LLM probes both returned HTTP 429; Ollama server unreachable; Dash0 configuration absent. M0 remains incomplete; real-AI/telemetry acceptance blocked.
 - Scope: check tools, memory, Docker, real AI connectivity, Dash0 access and compatible dependency versions; record blockers before scaffolding. Do not print environment values or credential files.
 - Files/components affected: future `.env.example`, `docs/specs/architecture.md` dependency decisions only; inspect existing Docker/workflow without rewriting.
 - Acceptance criteria: Java 21, Node 22, Docker Compose usable; embedding probe confirms actual model dimension; short LLM request succeeds; Dash0 endpoint/auth available; exact versions chosen from current docs. Ollama selected only if already practical. Missing credentials explicitly block affected FRs.
@@ -30,7 +35,8 @@ Critical path: M0 → M1 → M2 → M3 → M4 → M6 → M8. M5 can follow M2 be
 
 ### M1 — Add isolated backend and local dependencies
 
-- [ ] Complete M1.
+- [x] Complete M1.
+- Verification evidence (2026-11-09): Compose config valid; both dependencies healthy and Elasticsearch green; three health integration tests observed failing with missing-endpoint 404s, then all passed; live backend `/healthz` and PostgreSQL-backed `/readyz` return `ok`, `/api/v1/version` identifies the backend. See `docs/local-development.md` for reproducible startup.
 - Scope: scaffold Java backend with wrapper, Compose PostgreSQL/Elasticsearch, health/version endpoints and environment-based configuration. Preserve root starter build.
 - Files/components affected: `backend/build.gradle`, `backend/settings.gradle`, `backend/gradlew`, `backend/gradle/wrapper/`, `backend/src/main/java/io/conferencewingman/WingmanApplication.java`, `backend/src/main/resources/application.yml`, `compose.yaml`, `.env.example`, `.gitignore` additions for Gradle/Next output; `backend/src/test/java/io/conferencewingman/HealthIntegrationTest.java`.
 - Acceptance criteria: dependencies healthy; backend starts on 8081; health/version returns JSON or starter-compatible health text; no passwords committed; containers bind dependency ports to loopback and persist named volumes.

@@ -22,6 +22,8 @@ class RequestSecurityFilter extends OncePerRequestFilter {
     private final String origin;
     private final int conferenceLimit;
     private final int registrationLimit;
+    private final int introductionLimit;
+    private final int retryLimit;
     private final Set<String> trustedProxies;
     private final Map<String, Window> windows = new HashMap<>();
     private record Window(long minute, int count) {}
@@ -30,6 +32,8 @@ class RequestSecurityFilter extends OncePerRequestFilter {
             @Value("${PUBLIC_APP_URL:http://localhost:3000}") String publicUrl,
             @Value("${wingman.rate-limit.conferences-per-minute:60}") int conferenceLimit,
             @Value("${wingman.rate-limit.registrations-per-minute:120}") int registrationLimit,
+            @Value("${wingman.rate-limit.introductions-per-minute:5}") int introductionLimit,
+            @Value("${wingman.rate-limit.match-retries-per-minute:2}") int retryLimit,
             @Value("${wingman.rate-limit.trusted-proxies:}") String trustedProxies) {
         this.json = json;
         this.registrations = registrations;
@@ -37,6 +41,8 @@ class RequestSecurityFilter extends OncePerRequestFilter {
         this.origin = base.getScheme() + "://" + base.getRawAuthority();
         this.conferenceLimit = conferenceLimit;
         this.registrationLimit = registrationLimit;
+        this.introductionLimit = introductionLimit;
+        this.retryLimit = retryLimit;
         this.trustedProxies = trustedProxies.isBlank() ? Set.of()
             : Arrays.stream(trustedProxies.split(",")).map(String::trim).map(RequestSecurityFilter::normalizeIpLiteral)
                 .filter(Objects::nonNull).collect(java.util.stream.Collectors.toUnmodifiableSet());
@@ -86,6 +92,15 @@ class RequestSecurityFilter extends OncePerRequestFilter {
                 }
                 request.setAttribute("wingman.registrationId", registration.get().id);
                 request.setAttribute("wingman.conferenceId", registration.get().conferenceId);
+                if (mutation) {
+                    String operation = path.equals("/api/v1/me/introductions") ? "introduction"
+                        : path.equals("/api/v1/me/matches/retry") ? "match-retry" : null;
+                    int limit = "introduction".equals(operation) ? introductionLimit : retryLimit;
+                    if (operation != null && !allow(operation + ":" + registration.get().id, limit)) {
+                        response.setHeader("Retry-After", "60");
+                        reject(response, 429, "RATE_LIMITED", "Please retry shortly."); return;
+                    }
+                }
             } catch (DataAccessException unavailable) {
                 response.setHeader("Retry-After", "5");
                 reject(response, 503, "DATABASE_UNAVAILABLE", "Please retry shortly."); return;

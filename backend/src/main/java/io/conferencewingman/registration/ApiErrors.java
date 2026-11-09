@@ -6,6 +6,7 @@ import org.springframework.http.*;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.*;
 import org.springframework.web.bind.annotation.*;
+import io.conferencewingman.ai.LlmClient;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
@@ -15,7 +16,7 @@ class ApiErrors {
     @ExceptionHandler(ApiError.class)
     ResponseEntity<?> known(ApiError error) { return response(error.status,error.code,error.getMessage(),Map.of()); }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ExceptionHandler({MethodArgumentNotValidException.class, jakarta.validation.ConstraintViolationException.class})
     ResponseEntity<?> validation(MethodArgumentNotValidException error) {
         Map<String,String> fields=new LinkedHashMap<>();
         error.getBindingResult().getFieldErrors().forEach(field -> fields.put(field.getField(),"Check this field."));
@@ -27,6 +28,9 @@ class ApiErrors {
 
     @ExceptionHandler(DataAccessException.class)
     ResponseEntity<?> database(DataAccessException error) { return response(503,"DATABASE_UNAVAILABLE","Please retry shortly.",Map.of()); }
+
+    @ExceptionHandler(LlmClient.LlmException.class)
+    ResponseEntity<?> provider(LlmClient.LlmException error) { return response(503,"AI_UNAVAILABLE","Recommendations are temporarily unavailable.",Map.of()); }
 
     private ResponseEntity<?> response(int status,String code,String message,Map<String,String> fields) {
         var builder=ResponseEntity.status(status).cacheControl(CacheControl.noStore());

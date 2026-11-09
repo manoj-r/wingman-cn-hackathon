@@ -16,6 +16,10 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+  http:
+    client:
+      connect-timeout: 2s
+      read-timeout: 10s
 management:
   endpoints:
     web:
@@ -31,6 +35,14 @@ management:
           include: readinessState,db
 wingman:
   version: ${APP_VERSION:local}
+  embedding:
+    base-url: ${EMBEDDING_BASE_URL:}
+    api-key: ${EMBEDDING_API_KEY:}
+    model: ${EMBEDDING_MODEL:}
+    dimensions: ${EMBEDDING_DIMENSIONS:0}
+  matching:
+    max-attempts: 3
+    poll-ms: 1000
 logging:
   level:
     # PostgreSQL constraint diagnostics include private email/idempotency values.

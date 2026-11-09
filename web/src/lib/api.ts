@@ -1,6 +1,9 @@
 export type Conference = { id: string; name: string; description: string; location: string; startDate: string; endDate: string };
 export type Management = { conference: Conference; registrationUrl: string; registeredAttendeeCount: number };
 export type Created = { conference: Conference; registrationUrl: string; organizerToken: string };
+export type Match = { attendeeId: string; name: string; jobTitle: string; company: string; interests: string[]; explanation: string; conversationStarter: string };
+export type Matches = { registrationId: string; matchingStatus: "PENDING" | "PROCESSING" | "READY" | "FAILED"; generationMode: "llm" | "template" | null; matches: Match[]; availableMatchCount: number; retryable: boolean; pollAfterSeconds?: number; failureCode?: string; traceId?: string };
+export type Introduction = { targetAttendeeId: string; text: string; generationMode: "llm" | "template"; delivery: "copy-only" };
 export class ApiError extends Error {
   constructor(public status: number, message: string, public fields: Record<string, string> = {}, public traceId?: string, public retryAfter?: string) { super(message); }
 }

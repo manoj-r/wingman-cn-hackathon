@@ -11,7 +11,7 @@ test("home is the attendee directory and links each listed conference to registr
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Find your next conference" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Cloud Native Connections" })).toBeVisible();
-  await expect(page.getByText("Meet fellow builders")).toBeVisible();
+  await expect(page.getByText("Meet fellow builders", { exact: true })).toBeVisible();
   await expect(page.getByText("Denver")).toBeVisible();
   await expect(page.getByRole("link", { name: "Register" })).toHaveAttribute("href", registrationPath);
   await expect(page.getByRole("link", { name: "Create conference" })).toHaveAttribute("href", "/conferences/new");
@@ -22,7 +22,7 @@ test("directory handles loading failure with retry and an empty result", async (
   await request.post(`${fixture}/__reset`, { data: { failDirectory: true } });
   await page.goto("/");
   await expect(page.getByRole("status")).toBeVisible();
-  await expect(page.getByRole("alert")).toContainText("temporarily unavailable");
+  await expect(page.locator("main [role=alert]")).toContainText("temporarily unavailable");
   await request.post(`${fixture}/__reset`, { data: { conferences: [] } });
   await page.getByRole("button", { name: "Retry loading conferences" }).click();
   await expect(page.getByRole("heading", { name: "No conferences are open for registration yet" })).toBeVisible();
@@ -88,7 +88,7 @@ test("attendee validates interests, reuses retry key, reaches confirmation, and 
   await expect(page.getByRole("main").getByRole("alert")).toContainText("fixture-trace");
   await page.getByRole("button", { name: "Register and continue" }).click();
   await expect(page).toHaveURL("/connections");
-  await expect(page.getByRole("heading", { name: "You’re registered" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your connections" })).toBeVisible();
   const state = await (await request.get(`${fixture}/__state`)).json();
   expect(state.registrations).toHaveLength(2);
   expect(state.registrations[0].key).toMatch(/^[0-9a-f-]{36}$/);

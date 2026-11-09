@@ -1,0 +1,16 @@
+replicaCount: 2
+image:
+  repository: ghcr.io/manoj-r/wingman-cn-hackathon
+  tag: "072b3b8"
+  pullPolicy: IfNotPresent
+teamName: wingman
+# Name only: no Secret or credential values are created by this chart.
+existingSecret: ""
+backend: false
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

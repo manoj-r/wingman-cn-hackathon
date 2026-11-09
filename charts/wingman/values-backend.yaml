@@ -1,0 +1,14 @@
+# Set an actual backend image and existing configuration Secret when rendering.
+backend: true
+replicaCount: 1
+image:
+  repository: ""
+  tag: ""
+existingSecret: ""
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

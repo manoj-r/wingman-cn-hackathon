@@ -71,6 +71,26 @@ class RequestSecurityFilterTest {
         assertThat(calls).hasValue(4097);
     }
 
+    @Test void percentEscapedPercentIsDecodedOnlyOnceAndRemainsRateLimited() throws Exception {
+        var calls = new AtomicInteger();
+        var filter = filter(1, "");
+        String path = "/api/v1/conferences/%25/registrations";
+
+        assertThat(invoke(filter, path, "203.0.113.1", null, null, calls).getStatus()).isEqualTo(200);
+        assertThat(invoke(filter, path, "203.0.113.1", null, null, calls).getStatus()).isEqualTo(429);
+        assertThat(calls).hasValue(1);
+    }
+
+    @Test void encodedRegistrationPathUsesRegistrationRateLimit() throws Exception {
+        var calls = new AtomicInteger();
+        var filter = filter(1, "");
+        String path = "/api/v1/conferences/00000000-0000-0000-0000-000000000001/%72egistrations";
+
+        assertThat(invoke(filter, path, "203.0.113.1", null, null, calls).getStatus()).isEqualTo(200);
+        assertThat(invoke(filter, path, "203.0.113.1", null, null, calls).getStatus()).isEqualTo(429);
+        assertThat(calls).hasValue(1);
+    }
+
     private static RequestSecurityFilter filter(int limit, String trustedProxies) {
         return new RequestSecurityFilter(new ObjectMapper(), mock(RegistrationRepository.class),
             "http://localhost:3000", limit, limit, trustedProxies);

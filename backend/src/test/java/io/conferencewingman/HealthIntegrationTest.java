@@ -9,8 +9,7 @@ import org.springframework.http.HttpStatus;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
-    "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration,org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration",
-    "management.endpoint.health.group.readiness.include=readinessState",
+    "spring.datasource.url=jdbc:postgresql://localhost:5432/wingman_test",
     "wingman.version=test-revision"
 })
 class HealthIntegrationTest {

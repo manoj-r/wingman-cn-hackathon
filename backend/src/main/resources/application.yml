@@ -10,6 +10,8 @@ spring:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/wingman}
     username: ${DATABASE_USERNAME:wingman}
     password: ${DATABASE_PASSWORD:}
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URL:http://localhost:9200}
   jpa:
     open-in-view: false
     hibernate:
@@ -35,11 +37,22 @@ management:
           include: readinessState,db
 wingman:
   version: ${APP_VERSION:local}
+  rate-limit:
+    introductions-per-minute: 5
+    match-retries-per-minute: 2
   embedding:
     base-url: ${EMBEDDING_BASE_URL:}
     api-key: ${EMBEDDING_API_KEY:}
     model: ${EMBEDDING_MODEL:}
     dimensions: ${EMBEDDING_DIMENSIONS:0}
+  llm:
+    base-url: ${LLM_BASE_URL:}
+    api-key: ${LLM_API_KEY:}
+    model: ${LLM_MODEL:}
+    timeout: 15s
+  elasticsearch:
+    url: ${ELASTICSEARCH_URL:http://localhost:9200}
+    api-key: ${ELASTICSEARCH_API_KEY:}
   matching:
     max-attempts: 3
     poll-ms: 1000

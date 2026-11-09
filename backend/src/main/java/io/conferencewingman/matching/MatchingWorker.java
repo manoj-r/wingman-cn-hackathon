@@ -20,14 +20,16 @@ public class MatchingWorker {
     private final VectorIndex index;
     private final MatchSearch search;
     private final MatchCandidateStore matchCandidates;
+    private final RecommendationService recommendations;
     private final int maxAttempts;
 
     public MatchingWorker(JdbcTemplate jdbc, org.springframework.transaction.PlatformTransactionManager manager,
         MatchingProfileSource profiles, EmbeddingClient embeddings, VectorIndex index, MatchSearch search,
-        MatchCandidateStore matchCandidates,
+        MatchCandidateStore matchCandidates, RecommendationService recommendations,
         @Value("${wingman.matching.max-attempts:3}") int maxAttempts) {
         this.jdbc=jdbc; this.transaction=new TransactionTemplate(manager); this.profiles=profiles;
         this.embeddings=embeddings; this.index=index; this.search=search; this.matchCandidates=matchCandidates;
+        this.recommendations=recommendations;
         this.maxAttempts=maxAttempts;
     }
 
@@ -53,10 +55,9 @@ public class MatchingWorker {
             index.upsert(profile.registrationId(),profile.conferenceId(),profile.attendeeId(),vector);
             List<UUID> candidates=search.find(profile.conferenceId(),profile.attendeeId(),vector);
             List<UUID> eligible=profiles.eligibleAttendees(profile.conferenceId(),profile.attendeeId(),candidates);
-            transaction.executeWithoutResult(status -> {
-                matchCandidates.replace(id,profile.conferenceId(),profile.attendeeId(),eligible);
-                jdbc.update("update registration set matching_status='READY', lease_until=null, next_attempt_at=null, safe_error_code=null, updated_at=now() where id=?",id);
-            });
+            matchCandidates.replace(id,profile.conferenceId(),profile.attendeeId(),eligible);
+            recommendations.generate(profile.conferenceId(),profile.attendeeId(),eligible);
+            jdbc.update("update registration set matching_status='READY', lease_until=null, next_attempt_at=null, safe_error_code=null, updated_at=now() where id=?",id);
         } catch(RuntimeException failure) {
             jdbc.update("update registration set matching_status=case when attempts >= ? then 'FAILED' else 'PENDING' end, lease_until=null, next_attempt_at=case when attempts >= ? then null else now() + interval '5 seconds' end, safe_error_code='MATCHING_UNAVAILABLE', updated_at=now() where id=?",
                 maxAttempts,maxAttempts,id);

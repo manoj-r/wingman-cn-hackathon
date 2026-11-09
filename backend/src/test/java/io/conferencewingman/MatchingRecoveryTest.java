@@ -21,6 +21,7 @@ class MatchingRecoveryTest {
         var index=mock(VectorIndex.class);
         var search=mock(MatchSearch.class);
         var matchCandidates=mock(MatchCandidateStore.class);
+        var recommendations=mock(RecommendationService.class);
         UUID id=UUID.randomUUID(), conference=UUID.randomUUID(), attendee=UUID.randomUUID();
         var profile=new MatchingProfileSource.Profile(id,conference,attendee,"Riley","Engineer","Example",
             "Building reliable systems","Find platform peers",List.of("Kubernetes"));
@@ -32,13 +33,14 @@ class MatchingRecoveryTest {
         UUID eligible=UUID.randomUUID();
         when(search.find(conference,attendee,new float[]{0.2f,0.8f})).thenReturn(List.of(eligible));
         when(profiles.eligibleAttendees(conference,attendee,List.of(eligible))).thenReturn(List.of(eligible));
-        var worker=new MatchingWorker(jdbc,manager,profiles,embeddings,index,search,matchCandidates,3);
+        var worker=new MatchingWorker(jdbc,manager,profiles,embeddings,index,search,matchCandidates,recommendations,3);
 
         assertThat(worker.processOne()).isTrue();
         verify(jdbc).update(contains("matching_status='PROCESSING'"),any(),eq(id));
         verify(index).upsert(id,conference,attendee,new float[]{0.2f,0.8f});
-        var completion=inOrder(matchCandidates,jdbc);
+        var completion=inOrder(matchCandidates,recommendations,jdbc);
         completion.verify(matchCandidates).replace(id,conference,attendee,List.of(eligible));
+        completion.verify(recommendations).generate(conference,attendee,List.of(eligible));
         completion.verify(jdbc).update(contains("matching_status='READY'"),eq(id));
     }
 
@@ -50,10 +52,11 @@ class MatchingRecoveryTest {
         var index=mock(VectorIndex.class);
         var search=mock(MatchSearch.class);
         var matchCandidates=mock(MatchCandidateStore.class);
+        var recommendations=mock(RecommendationService.class);
         when(embeddings.configured()).thenReturn(true);
         when(jdbc.query(contains("matching_status='PENDING'"),any(org.springframework.jdbc.core.RowMapper.class),eq(3)))
             .thenReturn(List.of());
-        var worker=new MatchingWorker(jdbc,manager,profiles,embeddings,index,search,matchCandidates,3);
+        var worker=new MatchingWorker(jdbc,manager,profiles,embeddings,index,search,matchCandidates,recommendations,3);
 
         assertThat(worker.processOne()).isFalse();
 
@@ -72,7 +75,8 @@ class MatchingRecoveryTest {
         when(embeddings.configured()).thenReturn(true);
         when(embeddings.embed(anyString())).thenThrow(new EmbeddingClient.EmbeddingException("private provider detail"));
         var matchCandidates=mock(MatchCandidateStore.class);
-        var worker=new MatchingWorker(jdbc,manager,profiles,embeddings,index,search,matchCandidates,3);
+        var recommendations=mock(RecommendationService.class);
+        var worker=new MatchingWorker(jdbc,manager,profiles,embeddings,index,search,matchCandidates,recommendations,3);
 
         assertThat(worker.processOne()).isTrue();
         verify(jdbc).update(contains("matching_status=case when attempts >= ? then 'FAILED' else 'PENDING' end"),eq(3),eq(3),eq(id));

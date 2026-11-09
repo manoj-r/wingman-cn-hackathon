@@ -12,4 +12,5 @@ interface RegistrationRepository extends JpaRepository<Registration, UUID> {
 
     Optional<Registration> findById(UUID id);
     boolean existsByConferenceIdAndAttendeeId(UUID conferenceId, UUID attendeeId);
+    Optional<Registration> findByConferenceIdAndAttendeeId(UUID conferenceId, UUID attendeeId);
 }

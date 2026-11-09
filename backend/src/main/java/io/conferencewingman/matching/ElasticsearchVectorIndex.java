@@ -15,9 +15,12 @@ public class ElasticsearchVectorIndex implements VectorIndex {
 
     public ElasticsearchVectorIndex(RestClient.Builder builder,
         @Value("${ELASTICSEARCH_URL:http://localhost:9200}") String url,
+        @Value("${ELASTICSEARCH_API_KEY:}") String apiKey,
         @Value("${wingman.embedding.dimensions:0}") int dimensions,
         @Value("${wingman.embedding.model:unconfigured}") String model) {
-        this.http=builder.clone().baseUrl(url).build(); this.dimensions=dimensions; this.model=model;
+        var client=builder.clone().baseUrl(url);
+        if(apiKey!=null&&!apiKey.isBlank()) client.defaultHeader("Authorization","ApiKey "+apiKey);
+        this.http=client.build(); this.dimensions=dimensions; this.model=model;
     }
 
     @Override public void upsert(UUID registration, UUID conference, UUID attendee, float[] vector) {

@@ -1,0 +1,33 @@
+server:
+  address: ${BACKEND_ADDRESS:127.0.0.1}
+  port: ${PORT:8081}
+spring:
+  config:
+    import: optional:file:../.env[.properties],optional:file:.env[.properties]
+  application:
+    name: conference-wingman-backend
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/wingman}
+    username: ${DATABASE_USERNAME:wingman}
+    password: ${DATABASE_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+      group:
+        readiness:
+          include: readinessState,db
+wingman:
+  version: ${APP_VERSION:local}

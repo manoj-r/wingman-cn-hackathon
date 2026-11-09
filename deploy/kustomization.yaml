@@ -6,6 +6,7 @@ kind: Kustomization
 namespace: team-wingman
 resources:
   - deployment.yaml
+  - cluster.yaml
   - service.yaml
   - httproute.yaml
 images:

@@ -3,7 +3,11 @@ import type { NextConfig } from "next";
 const backend = process.env.BACKEND_URL || "http://127.0.0.1:8081";
 const config: NextConfig = {
   async rewrites() {
-    return [{ source: "/api/v1/:path*", destination: `${backend}/api/v1/:path*` }];
+    return [
+      { source: "/api/v1/:path*", destination: `${backend}/api/v1/:path*` },
+      { source: "/healthz", destination: `${backend}/healthz` },
+      { source: "/readyz", destination: `${backend}/readyz` },
+    ];
   },
   async headers() {
     return [{ source: "/:path*", headers: [

@@ -5,9 +5,7 @@ metadata:
   labels:
     app: app
 spec:
-  # Remove this line when you turn on the HPA (examples/hpa), or Argo CD and
-  # the autoscaler will keep resetting each other.
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: app
@@ -25,13 +23,84 @@ spec:
           env:
             - name: TEAM_NAME
               value: "wingman"
+            - name: BACKEND_URL
+              value: http://127.0.0.1:8081
+            - name: BACKEND_ADDRESS
+              value: 127.0.0.1
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: db-app
+                  key: uri
+            - name: DATABASE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-app
+                  key: username
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-app
+                  key: password
+            - name: PUBLIC_APP_URL
+              value: https://wingman.cnh.radarhq.io
+            - name: ELASTICSEARCH_URL
+              value: https://my-vectordb-project-a3270f.es.us-west-2.aws.elastic.cloud:443
+            - name: ELASTICSEARCH_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: elastic-cloud
+                  key: ELASTICSEARCH_API_KEY
+                  optional: true
+            - name: EMBEDDING_PROVIDER
+              value: openai
+            - name: EMBEDDING_BASE_URL
+              value: https://api.openai.com/v1
+            - name: EMBEDDING_MODEL
+              value: text-embedding-3-small
+            - name: EMBEDDING_DIMENSIONS
+              value: "1536"
+            - name: EMBEDDING_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openai-llm
+                  key: OPENAI_API_KEY
+                  optional: true
+            - name: LLM_PROVIDER
+              value: openai
+            - name: LLM_BASE_URL
+              value: https://api.openai.com/v1
+            - name: LLM_MODEL
+              value: gpt-4.1-mini
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openai-llm
+                  key: OPENAI_API_KEY
+                  optional: true
+            - name: OTEL_SERVICE_NAME
+              value: conference-wingman-backend
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: dash0-otel
+                  key: OTEL_EXPORTER_OTLP_HEADERS
+                  optional: true
+            - name: WINGMAN_RATE_LIMIT_TRUSTED_PROXIES
+              value: 127.0.0.1
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
               cpu: 500m
-              memory: 256Mi
+              memory: 1Gi
+            limits:
+              cpu: 1500m
+              memory: 2Gi
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /readyz

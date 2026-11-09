@@ -1,6 +1,6 @@
 # Local development
 
-The original `app/`, root Dockerfile, GitHub build workflow and Radar manifests remain unchanged. The new Java backend runs locally on loopback port 8081; PostgreSQL and Elasticsearch run through Compose. Frontend and networking features are subsequent milestones.
+The original `app/`, root Dockerfile, GitHub build workflow and Radar manifests remain unchanged. The Java backend runs locally on loopback port 8081; PostgreSQL and Elasticsearch run through Compose. `backend/Dockerfile` builds a separate Java backend image with a pinned OpenTelemetry Java agent. Frontend and networking features are subsequent milestones.
 
 ## Prerequisites
 
@@ -15,9 +15,49 @@ docker compose version
 
 ## OpenTelemetry
 
-The backend uses the OpenTelemetry SDK for explicit application spans and OTLP/HTTP export. Configure `OTEL_TRACES_EXPORTER=otlp`, `OTEL_EXPORTER_OTLP_ENDPOINT` (the full trace endpoint, typically ending in `/v1/traces`), and `OTEL_EXPORTER_OTLP_HEADERS` in the local environment. Keep endpoint credentials in ignored `.env` or another secret store. With the default exporter `none`, or without an endpoint, the backend runs without exporting. Export uses a bounded timeout and a background batch processor, so an unavailable collector does not fail registration. Registration spans record only the fixed operation and outcome; no attendee or conference data is added.
+The backend container uses the OpenTelemetry Java agent for HTTP and JDBC instrumentation and retains one explicit registration span. The agent is the only SDK/exporter; application code uses its OpenTelemetry API. OTLP traces, metrics, and logs default to disabled. To opt into traces, set `OTEL_TRACES_EXPORTER=otlp`, `OTEL_EXPORTER_OTLP_ENDPOINT` to the Dash0 OTLP/HTTP base endpoint, `OTEL_EXPORTER_OTLP_HEADERS` in a private environment, and optionally `OTEL_SERVICE_NAME` (defaults to `conference-wingman-backend`). The exporter appends `/v1/traces` to the base endpoint. The agent's batch exporter is asynchronous with a 5-second export timeout, so an unavailable collector does not block registration.
 
-Dash0's Java integration recommends the OpenTelemetry Java agent (or its Kubernetes Operator) for automatic instrumentation. We retain explicit SDK instrumentation for this MVP because the agent's Spring MVC server spans include raw `url.path` and `url.query` attributes by default; this API puts conference and registration identifiers in paths. Its documented path exclusion/sampling controls do not redact those attributes while retaining the spans. Enabling the agent before an attribute-redaction mechanism is verified would send identifier-bearing URLs to the exporter. HTTP/JDBC automatic spans and provider/matching/introduction spans therefore remain out of scope for this privacy-preserving slice. Keep all OTLP headers private; do not paste them into commands captured in shell history.
+Before export, the bundled agent extension allowlists span and resource attributes, rewrites automatic span names to fixed labels, and strips event/link attributes and status descriptions. It removes raw URL paths, query strings, full URLs, headers, SQL statements/parameters, prompts, vectors, and unrecognized attributes. It retains only known HTTP methods/statuses, the registered route templates, PostgreSQL operation names, the service identity, and the fixed registration operation/outcome. Baggage propagation is disabled. Focused exporter tests assert private sample values do not reach the delegate exporter.
+
+The backend runtime image is built separately from the current Node starter image:
+
+```sh
+docker build -f backend/Dockerfile -t wingman-backend:local .
+```
+
+The image pins OpenTelemetry Java agent `2.33.1` and checks SHA-256 `e43a270df53c6f423e0ab157be9c27ccc01d5dc3232e162fe54777573db2f149` while building. It starts Java with `-javaagent` and loads the privacy extension. The current `deploy/` manifests still target the Node starter; the example below shows the Secret and environment mapping to use when the Java backend image is selected for a workload.
+
+Create this Secret through Radar in namespace `team-wingman`, replacing the placeholder privately. Do not commit a populated Secret manifest:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dash0-otel
+  namespace: team-wingman
+type: Opaque
+stringData:
+  OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer <DASH0_TOKEN>"
+```
+
+Map the Secret and Dash0 endpoint on the Java backend container:
+
+```yaml
+env:
+  - name: OTEL_TRACES_EXPORTER
+    value: otlp
+  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+    value: "<DASH0_OTLP_HTTP_BASE_ENDPOINT>"
+  - name: OTEL_EXPORTER_OTLP_HEADERS
+    valueFrom:
+      secretKeyRef:
+        name: dash0-otel
+        key: OTEL_EXPORTER_OTLP_HEADERS
+  - name: OTEL_SERVICE_NAME
+    value: conference-wingman-backend
+```
+
+Keep the exporter endpoint and authorization header out of command-line arguments. The header is read from the Secret as an environment variable; the service name and endpoint are ordinary runtime configuration.
 
 ## Local dependencies
 

@@ -10,9 +10,7 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
 repositories { mavenCentral() }
 
 dependencies {
-    implementation 'io.opentelemetry:opentelemetry-api:1.55.0'
-    implementation 'io.opentelemetry:opentelemetry-sdk:1.55.0'
-    implementation 'io.opentelemetry:opentelemetry-exporter-otlp:1.55.0'
+    implementation 'io.opentelemetry:opentelemetry-api:1.67.0'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
@@ -21,8 +19,10 @@ dependencies {
     runtimeOnly 'org.flywaydb:flyway-database-postgresql'
     runtimeOnly 'org.postgresql:postgresql'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'io.opentelemetry:opentelemetry-sdk-testing:1.55.0'
+    testImplementation 'io.opentelemetry:opentelemetry-sdk:1.67.0'
+    testImplementation 'io.opentelemetry:opentelemetry-sdk-testing:1.67.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') { useJUnitPlatform() }
+tasks.named('bootJar') { archiveFileName = 'app.jar' }

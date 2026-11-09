@@ -13,6 +13,10 @@ java -version
 docker compose version
 ```
 
+## OpenTelemetry
+
+The backend has a built-in OpenTelemetry SDK for explicit application spans and OTLP/HTTP export; it does not require a Java agent. Configure `OTEL_TRACES_EXPORTER=otlp`, `OTEL_EXPORTER_OTLP_ENDPOINT` (the full trace endpoint, typically ending in `/v1/traces`), and `OTEL_EXPORTER_OTLP_HEADERS` in the local environment. Keep endpoint credentials in ignored `.env` or another secret store. With the default exporter `none`, or without an endpoint, the backend runs without exporting. Export uses a bounded timeout and a background batch processor, so an unavailable collector does not fail registration. Registration spans record only the fixed operation and outcome; no attendee or conference data is added. HTTP/JDBC automatic spans and provider/matching/introduction spans are not included in this minimal M7 slice. Keep all OTLP headers private; do not paste them into commands captured in shell history.
+
 ## Local dependencies
 
 Copy `.env.example` to ignored `.env` and fill `DATABASE_PASSWORD` with a private random value. Plain `KEY=value` format is supported by both Compose and Spring; use URL-safe password characters. Never commit `.env`. Alternatively, this command creates a minimal password-only file and refuses to overwrite one:

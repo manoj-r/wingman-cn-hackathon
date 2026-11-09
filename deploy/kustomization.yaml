@@ -11,4 +11,4 @@ resources:
 images:
   - name: app
     newName: ghcr.io/manoj-r/wingman-cn-hackathon
-    newTag: 1f9e8a6
+    newTag: bf15967

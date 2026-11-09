@@ -11,37 +11,45 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UrlPathHelper;
 
 @Component
 class RequestSecurityFilter extends OncePerRequestFilter {
     private static final int BODY_LIMIT = 16 * 1024;
+    private static final UrlPathHelper PATHS = lookupPathHelper();
     private final ObjectMapper json;
     private final RegistrationRepository registrations;
     private final String origin;
     private final int conferenceLimit;
     private final int registrationLimit;
+    private final Set<String> trustedProxies;
     private final Map<String, Window> windows = new HashMap<>();
     private record Window(long minute, int count) {}
 
     RequestSecurityFilter(ObjectMapper json, RegistrationRepository registrations,
             @Value("${PUBLIC_APP_URL:http://localhost:3000}") String publicUrl,
             @Value("${wingman.rate-limit.conferences-per-minute:60}") int conferenceLimit,
-            @Value("${wingman.rate-limit.registrations-per-minute:120}") int registrationLimit) {
+            @Value("${wingman.rate-limit.registrations-per-minute:120}") int registrationLimit,
+            @Value("${wingman.rate-limit.trusted-proxies:}") String trustedProxies) {
         this.json = json;
         this.registrations = registrations;
         URI base = URI.create(publicUrl);
         this.origin = base.getScheme() + "://" + base.getRawAuthority();
         this.conferenceLimit = conferenceLimit;
         this.registrationLimit = registrationLimit;
+        this.trustedProxies = trustedProxies.isBlank() ? Set.of()
+            : Arrays.stream(trustedProxies.split(",")).map(String::trim).map(RequestSecurityFilter::normalizeIpLiteral)
+                .filter(Objects::nonNull).collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     @Override protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().startsWith("/api/v1/");
+        String path = lookupPath(request);
+        return !path.startsWith("/api/v1/");
     }
 
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
             FilterChain chain) throws ServletException, IOException {
-        String path = request.getRequestURI();
+        String path = lookupPath(request);
         boolean mutation = Set.of("POST", "PUT", "PATCH", "DELETE").contains(request.getMethod());
         if (mutation) {
             String suppliedOrigin = request.getHeader("Origin");
@@ -51,7 +59,7 @@ class RequestSecurityFilter extends OncePerRequestFilter {
             }
             String operation = path.equals("/api/v1/conferences") ? "conference"
                 : path.matches("/api/v1/conferences/[^/]+/registrations") ? "registration" : null;
-            if (operation != null && !allow(operation + ":" + request.getRemoteAddr(),
+            if (operation != null && !allow(operation + ":" + clientAddress(request),
                     operation.equals("conference") ? conferenceLimit : registrationLimit)) {
                 response.setHeader("Retry-After", "60");
                 reject(response, 429, "RATE_LIMITED", "Please retry shortly."); return;
@@ -90,11 +98,54 @@ class RequestSecurityFilter extends OncePerRequestFilter {
         long minute = Instant.now().getEpochSecond() / 60;
         windows.entrySet().removeIf(entry -> entry.getValue().minute() != minute);
         Window previous = windows.get(key);
-        if (previous == null && windows.size() >= 4096) return false;
         int count = previous == null ? 0 : previous.count();
         if (count >= limit) return false;
+        if (previous == null && windows.size() >= 4096) {
+            windows.entrySet().stream().min(Comparator.comparingLong(e -> e.getValue().minute()))
+                .ifPresent(oldest -> windows.remove(oldest.getKey()));
+        }
         windows.put(key, new Window(minute, count + 1));
         return true;
+    }
+
+    private static String lookupPath(HttpServletRequest request) {
+        String decoded = PATHS.decodeRequestString(request, PATHS.getPathWithinApplication(request));
+        return decoded.replaceAll(";[^/]*", "");
+    }
+
+    private static UrlPathHelper lookupPathHelper() {
+        UrlPathHelper helper = new UrlPathHelper();
+        helper.setUrlDecode(true);
+        helper.setRemoveSemicolonContent(true);
+        return helper;
+    }
+
+    private String clientAddress(HttpServletRequest request) {
+        String peer = request.getRemoteAddr();
+        if (!trustedProxies.contains(peer)) return peer;
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded == null || forwarded.isBlank()) return peer;
+        String[] chain = forwarded.split(",");
+        // Walk from the gateway inward. X-Forwarded-For can contain attacker-supplied
+        // values at its left edge when a proxy appends rather than replaces the header.
+        for (int i = chain.length - 1; i >= 0; i--) {
+            String address = normalizeIpLiteral(chain[i].trim());
+            if (address == null) return peer;
+            if (!trustedProxies.contains(address)) return address;
+        }
+        return peer;
+    }
+
+    private static String normalizeIpLiteral(String value) {
+        try {
+            if (value.contains(":") && value.matches("[0-9a-fA-F:.]+"))
+                return java.net.InetAddress.getByName(value).getHostAddress();
+            if (value.matches("[0-9]{1,3}(\\.[0-9]{1,3}){3}")) {
+                for (String octet : value.split("\\.")) if (Integer.parseInt(octet) > 255) return null;
+                return java.net.InetAddress.getByName(value).getHostAddress();
+            }
+        } catch (java.net.UnknownHostException ignored) { }
+        return null;
     }
 
     private void reject(HttpServletResponse response, int status, String code, String message) throws IOException {

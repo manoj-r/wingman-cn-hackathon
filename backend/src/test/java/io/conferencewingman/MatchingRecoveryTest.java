@@ -37,6 +37,25 @@ class MatchingRecoveryTest {
         verify(jdbc).update(contains("matching_status='READY'"),eq(id));
     }
 
+    @Test void terminallyFailsExpiredFinalAttemptBeforeClaimingMoreWork() {
+        var jdbc=mock(JdbcTemplate.class);
+        var manager=mock(PlatformTransactionManager.class);
+        var profiles=mock(MatchingProfileSource.class);
+        var embeddings=mock(EmbeddingClient.class);
+        var index=mock(VectorIndex.class);
+        var search=mock(MatchSearch.class);
+        when(embeddings.configured()).thenReturn(true);
+        when(jdbc.query(contains("matching_status='PENDING'"),any(org.springframework.jdbc.core.RowMapper.class),eq(3)))
+            .thenReturn(List.of());
+        var worker=new MatchingWorker(jdbc,manager,profiles,embeddings,index,search,3);
+
+        assertThat(worker.processOne()).isFalse();
+
+        var order=inOrder(jdbc);
+        order.verify(jdbc).update(contains("matching_status='FAILED'"),eq(3));
+        order.verify(jdbc).query(contains("matching_status='PENDING'"),any(org.springframework.jdbc.core.RowMapper.class),eq(3));
+    }
+
     @Test void providerFailureReturnsDurableWorkToRetryWithSafeCode() {
         var jdbc=mock(JdbcTemplate.class); var manager=mock(PlatformTransactionManager.class);
         var profiles=mock(MatchingProfileSource.class); var embeddings=mock(EmbeddingClient.class);

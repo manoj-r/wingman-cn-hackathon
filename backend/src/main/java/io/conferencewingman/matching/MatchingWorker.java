@@ -34,6 +34,7 @@ public class MatchingWorker {
     public boolean processOne() {
         if (!embeddings.configured()) return false;
         UUID id=transaction.execute(status -> {
+            jdbc.update("update registration set matching_status='FAILED', lease_until=null, next_attempt_at=null, safe_error_code='MATCHING_UNAVAILABLE', updated_at=now() where matching_status='PROCESSING' and lease_until<=now() and attempts >= ?", maxAttempts);
             var rows=jdbc.query("select id from registration where ((matching_status='PENDING' and (next_attempt_at is null or next_attempt_at<=now())) or (matching_status='PROCESSING' and lease_until<=now())) and attempts < ? order by created_at for update skip locked limit 1",
                 (rs,row)->rs.getObject(1,UUID.class), maxAttempts);
             if(rows.isEmpty()) return null;

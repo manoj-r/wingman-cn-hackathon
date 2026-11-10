@@ -11,12 +11,12 @@ Optional. Use it if your app needs a database. The CloudNativePG operator is alr
        valueFrom:
          secretKeyRef:
            name: db-app
-           key: uri
+           key: jdbc-uri
    ```
 
 3. Push. Argo CD creates the database, and it's ready in about a minute. Until the operator has made Secret `db-app`, the app's new pods wait with `CreateContainerConfigError`, then start on their own. Have the app retry its first connection.
 4. See it in Radar: Cluster `db` under Resources (kind `Cluster`, group `postgresql.cnpg.io`), its pod `db-1`, its PVC and the `db-rw` Service. Your agent can wait for the Cluster's `Ready` condition with `wait_for`.
 
-How the app reaches it: Service `db-rw`, port 5432, database `app`, user `app`. Secret `db-app` (made by the operator, not in git) has `username`, `password`, `host`, `port`, `dbname` and the full `uri`. The data lives on the PVC, so it survives pod restarts; it's deleted with your cluster on Nov 13.
+How the app reaches it: Service `db-rw`, port 5432, database `app`, user `app`. Secret `db-app` (made by the operator, not in git) has `username`, `password`, `host`, `port`, `dbname`, `uri`, and `jdbc-uri`. The app uses `jdbc-uri` for `DATABASE_URL` and the separate `username` and `password` keys for authentication. The data lives on the PVC, so it survives pod restarts; it's deleted with your cluster on Nov 13.
 
 Budget: the database is one pod (100m CPU and 256Mi of requests, 500m and 512Mi of limits) and one 1Gi PVC, out of your team's 2 CPU / 4 GiB of requests and 4 PVCs / 20 GiB.

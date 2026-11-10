@@ -11,6 +11,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import io.conferencewingman.observability.RegistrationTelemetry;
 
 import static io.conferencewingman.registration.RegistrationApi.*;
 
@@ -22,13 +23,15 @@ class RegistrationService {
     private final TransactionTemplate transaction;
     private final ObjectMapper json;
     private final String publicUrl;
+    private final RegistrationTelemetry telemetry;
     private final SecureRandom random = new SecureRandom();
 
     RegistrationService(ConferenceRepository conferences, AttendeeRepository attendees,
                         RegistrationRepository registrations, PlatformTransactionManager manager,
-                        ObjectMapper json, @Value("${PUBLIC_APP_URL:http://localhost:3000}") String publicUrl) {
+                        ObjectMapper json, RegistrationTelemetry telemetry,
+                        @Value("${PUBLIC_APP_URL:http://localhost:3000}") String publicUrl) {
         this.conferences=conferences; this.attendees=attendees; this.registrations=registrations;
-        this.transaction=new TransactionTemplate(manager); this.json=json;
+        this.transaction=new TransactionTemplate(manager); this.json=json; this.telemetry=telemetry;
         if (!publicUrl.matches("https?://[^?#]+")) throw new IllegalArgumentException("PUBLIC_APP_URL must be an HTTP(S) base URL without query or fragment");
         this.publicUrl=publicUrl.replaceAll("/+$", "");
     }
@@ -65,6 +68,11 @@ class RegistrationService {
     record Result(RegistrationView view, String token, boolean created) {}
 
     Result register(UUID conference, UUID key, AttendeeInput supplied) {
+        return telemetry.record(() -> registerTraced(conference,key,supplied), result ->
+            result.created() ? "created" : "replayed");
+    }
+
+    private Result registerTraced(UUID conference, UUID key, AttendeeInput supplied) {
         AttendeeInput input=normalize(supplied);
         byte[] digest;
         try { digest=hash(json.writeValueAsString(input)); }
@@ -73,7 +81,9 @@ class RegistrationService {
             return transaction.execute(status -> {
                 findConference(conference);
                 var existing=registrations.findByConferenceIdAndIdempotencyKey(conference,key);
-                if (existing.isPresent()) return replay(existing.get(),digest);
+                if (existing.isPresent()) {
+                    return replay(existing.get(),digest);
+                }
                 Instant now=Instant.now();
                 Attendee a=new Attendee(); a.id=UUID.randomUUID(); a.name=input.name(); a.email=input.email();
                 a.jobTitle=input.jobTitle(); a.company=input.company(); a.bio=input.bio();

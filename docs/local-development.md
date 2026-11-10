@@ -13,6 +13,12 @@ java -version
 docker compose version
 ```
 
+## OpenTelemetry
+
+The backend uses the OpenTelemetry SDK for explicit application spans and OTLP/HTTP export. Configure `OTEL_TRACES_EXPORTER=otlp`, `OTEL_EXPORTER_OTLP_ENDPOINT` (the full trace endpoint, typically ending in `/v1/traces`), and `OTEL_EXPORTER_OTLP_HEADERS` in the local environment. Keep endpoint credentials in ignored `.env` or another secret store. With the default exporter `none`, or without an endpoint, the backend runs without exporting. Export uses a bounded timeout and a background batch processor, so an unavailable collector does not fail registration. Registration spans record only the fixed operation and outcome; no attendee or conference data is added.
+
+Dash0's Java integration recommends the OpenTelemetry Java agent (or its Kubernetes Operator) for automatic instrumentation. We retain explicit SDK instrumentation for this MVP because the agent's Spring MVC server spans include raw `url.path` and `url.query` attributes by default; this API puts conference and registration identifiers in paths. Its documented path exclusion/sampling controls do not redact those attributes while retaining the spans. Enabling the agent before an attribute-redaction mechanism is verified would send identifier-bearing URLs to the exporter. HTTP/JDBC automatic spans and provider/matching/introduction spans therefore remain out of scope for this privacy-preserving slice. Keep all OTLP headers private; do not paste them into commands captured in shell history.
+
 ## Local dependencies
 
 Copy `.env.example` to ignored `.env` and fill `DATABASE_PASSWORD` with a private random value. Plain `KEY=value` format is supported by both Compose and Spring; use URL-safe password characters. Never commit `.env`. Alternatively, this command creates a minimal password-only file and refuses to overwrite one:
@@ -41,7 +47,7 @@ Tests use `wingman_test`, never reset demo data, and leave uniquely identified f
 ./backend/gradlew -p backend bootRun
 ```
 
-Spring imports the ignored root `.env` as a properties file. Stop the backend with Ctrl-C. From a second terminal:
+Spring imports the ignored root `.env` as a properties file. Set `ELASTICSEARCH_URL` and `ELASTICSEARCH_API_KEY` there for an external Elastic Cloud cluster; the key is sent only as an HTTP Authorization header by the backend. For Kubernetes, inject `ELASTICSEARCH_URL` and `ELASTICSEARCH_API_KEY` from a Secret in the backend container environment. PostgreSQL remains authoritative; Elasticsearch stores only rebuildable registration IDs, conference/attendee IDs and embedding vectors. Never put the API key in Helm values, manifests, browser configuration, logs, or source control. Stop the backend with Ctrl-C. From a second terminal:
 
 ```sh
 curl -f http://localhost:8081/healthz
@@ -62,4 +68,4 @@ Stopping preserves data. Do not remove volumes to resolve routine startup proble
 
 ## Provider prerequisites still open
 
-On 2026-11-09, minimal real calls using the existing OpenAI environment credential returned HTTP 429 for both `text-embedding-3-small` (1536 requested dimensions) and `gpt-4.1-mini`. No successful embedding or generation is claimed. Ollama's local server was not reachable. Dash0 OTLP endpoint/auth were absent from the current environment. Resolve these privately before accepting real-AI and telemetry milestones. No credentials, provider response bodies or profile text were logged by the probes.
+On 2026-11-09, minimal real calls using the existing OpenAI environment credential returned HTTP 429 for both `text-embedding-3-small` (1536 requested dimensions) and `gpt-4.1-mini`. No successful embedding or generation is claimed. Ollama's local server was not reachable. Dash0 OTLP endpoint/auth were absent from the current environment. Real Elastic Cloud connectivity has not been smoke-tested because no API key was supplied to the development environment. Inject `ELASTICSEARCH_URL` and `ELASTICSEARCH_API_KEY` privately before running the probe. Resolve provider access privately before accepting real-AI and telemetry milestones. No credentials, provider response bodies or profile text were logged by the probes.

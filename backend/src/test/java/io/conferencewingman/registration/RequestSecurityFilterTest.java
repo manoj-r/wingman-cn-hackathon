@@ -101,7 +101,7 @@ class RequestSecurityFilterTest {
 
     private static RequestSecurityFilter filter(int limit, String trustedProxies) {
         return new RequestSecurityFilter(new ObjectMapper(), mock(RegistrationRepository.class),
-            "http://localhost:3000", limit, limit, trustedProxies);
+            "http://localhost:3000", limit, limit, 5, 2, trustedProxies);
     }
 
     private static MockHttpServletResponse invoke(RequestSecurityFilter filter, String path, String peer,

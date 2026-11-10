@@ -31,7 +31,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: db-app
-                  key: uri
+                  key: jdbc-uri
             - name: DATABASE_USERNAME
               valueFrom:
                 secretKeyRef:

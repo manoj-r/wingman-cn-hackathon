@@ -2,11 +2,6 @@
 set -eu
 
 cd /app/web
-case "${DATABASE_URL:-}" in
-  postgresql://*) DATABASE_URL="jdbc:${DATABASE_URL}"; export DATABASE_URL ;;
-  postgres://*) DATABASE_URL="jdbc:postgresql://${DATABASE_URL#postgres://}"; export DATABASE_URL ;;
-esac
-
 java -jar /app/backend/app.jar &
 backend_pid=$!
 

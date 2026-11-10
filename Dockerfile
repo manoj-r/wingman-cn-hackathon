@@ -31,6 +31,6 @@ ENV APP_VERSION=$APP_VERSION \
     OTEL_SERVICE_NAME=conference-wingman-backend \
     OTEL_TRACES_EXPORTER=none
 
-USER node
+USER 1000:1000
 EXPOSE 8080
 ENTRYPOINT ["/bin/sh", "/usr/local/bin/wingman-entrypoint"]

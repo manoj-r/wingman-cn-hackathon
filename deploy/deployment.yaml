@@ -80,6 +80,8 @@ spec:
                   optional: true
             - name: OTEL_SERVICE_NAME
               value: conference-wingman-backend
+            - name: OTEL_TRACES_EXPORTER
+              value: otlp
             - name: OTEL_EXPORTER_OTLP_HEADERS
               valueFrom:
                 secretKeyRef:

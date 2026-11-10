@@ -40,6 +40,7 @@ wingman:
   rate-limit:
     introductions-per-minute: 5
     match-retries-per-minute: 2
+    trusted-proxies: ${WINGMAN_RATE_LIMIT_TRUSTED_PROXIES:}
   embedding:
     base-url: ${EMBEDDING_BASE_URL:}
     api-key: ${EMBEDDING_API_KEY:}

@@ -57,6 +57,11 @@ class RegistrationApi {
         return ResponseEntity.status(201).cacheControl(CacheControl.noStore()).body(service.createConference(input));
     }
 
+    @GetMapping
+    ResponseEntity<List<ConferenceView>> list() {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.conferences());
+    }
+
     @GetMapping("/{id}")
     ConferenceView get(@PathVariable UUID id) { return service.conference(id); }
 

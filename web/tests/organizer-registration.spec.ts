@@ -7,6 +7,27 @@ const registrationPath = `/conferences/${id}/register`;
 const fixture = "http://127.0.0.1:8189";
 test.beforeEach(async ({ request }) => { await request.post(`${fixture}/__reset`, { data: {} }); });
 
+test("home is the attendee directory and links each listed conference to registration", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Find your next conference" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cloud Native Connections" })).toBeVisible();
+  await expect(page.getByText("Meet fellow builders")).toBeVisible();
+  await expect(page.getByText("Denver")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Register" })).toHaveAttribute("href", registrationPath);
+  await expect(page.getByRole("link", { name: "Create conference" })).toHaveAttribute("href", "/conferences/new");
+  await expect(page.getByRole("link", { name: "Organizer tools" })).toHaveAttribute("href", "/organizer");
+});
+
+test("directory handles loading failure with retry and an empty result", async ({ page, request }) => {
+  await request.post(`${fixture}/__reset`, { data: { failDirectory: true } });
+  await page.goto("/");
+  await expect(page.getByRole("status")).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText("temporarily unavailable");
+  await request.post(`${fixture}/__reset`, { data: { conferences: [] } });
+  await page.getByRole("button", { name: "Retry loading conferences" }).click();
+  await expect(page.getByRole("heading", { name: "No conferences are open for registration yet" })).toBeVisible();
+});
+
 test("creation validates dates, renders a decodable public QR, and forgets the private token", async ({ page, request }) => {
   await page.goto("/conferences/new");
   await page.getByLabel("Conference name").fill("Cloud Native Connections");

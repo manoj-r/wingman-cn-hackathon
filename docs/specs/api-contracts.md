@@ -12,6 +12,8 @@ Error shape: `{"error":{"code":"VALIDATION_ERROR","message":"Check the highlight
 
 `POST /conferences` is public, rate limited.
 
+`GET /conferences` returns a no-store JSON array of public conference objects, ordered by start date. It never includes organizer tokens or attendee data. The attendee directory uses this endpoint; an empty array means no conferences are currently listed.
+
 Request:
 ```json
 {"name":"Cloud Native Connections","description":"Meet fellow builders","location":"Denver","startDate":"2026-11-09T16:00:00Z","endDate":"2026-11-10T01:00:00Z"}

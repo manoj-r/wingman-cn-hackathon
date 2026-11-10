@@ -59,6 +59,12 @@ class RegistrationService {
         return new ManagementView(view(c),registrationUrl(id),registrations.countByConferenceId(id));
     }
 
+    List<ConferenceView> conferences() {
+        return conferences.findTop100ByEndDateAfterOrderByStartDateAsc(Instant.now()).stream()
+            .map(c -> new ConferenceView(c.id, c.name, c.description, c.location, c.startDate, c.endDate))
+            .toList();
+    }
+
     record Result(RegistrationView view, String token, boolean created) {}
 
     Result register(UUID conference, UUID key, AttendeeInput supplied) {
